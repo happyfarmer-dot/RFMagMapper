@@ -251,7 +251,7 @@
       <button onclick="stepRandom()">+1 步移動</button>
       <button onclick="resetSimulation()">清除重設</button>
       <span style="font-size:0.78rem;color:var(--muted);margin-left:auto;">
-        模式：<strong id="modeLabel" style="color:var(--cyan)">手機實地步行中</strong>
+        狀態：<strong id="modeLabel" style="color:var(--cyan)">手機實地步行中（網頁版為模擬訊號，真實掃描請用 Android APK）</strong>
       </span>
     </div>
   </section>
@@ -317,7 +317,10 @@
     <ul>
       <li><strong>安裝 App</strong>：下載 <code>RFMagMapper_S24Ultra.apk</code> 到手機並點擊安裝（若跳出安全提醒請選擇允許）。</li>
       <li><strong>開啟權限</strong>：第一次打開請點「立即授權所有權限」，讓 App 可以使用定位（讀取 Wi-Fi 與 GPS）、藍牙掃描與計步器。</li>
-      <li><strong>讓地圖即時更新（建議設定）</strong>：Android 預設會限制 Wi-Fi 掃描次數以省電。建議到手機 <code>設定 → 關於手機 → 軟體資訊 → 連點「版本號碼」7 下</code> 開啟開發人員選項，再進去把 <code>Wi-Fi 掃描節流</code> 關掉，走路時地圖就會每秒即時更新。</li>
+      <li><strong>關閉手機掃描省電限制（重要！）</strong>：Android 手機為了省電，預設每 2 分鐘只會掃描 4 次 Wi-Fi，會讓地圖更新變慢。請依以下步驟關閉：
+        <br>① 打開手機 <code>設定 → 關於手機 → 軟體資訊</code>，連續點擊 <code>版本號碼</code> 7 下開啟開發人員模式。
+        <br>② 回到設定最下方進入 <code>開發人員選項</code>，找到並<strong>關閉「Wi-Fi 掃描節流」</strong>。
+        <br>（App 頂部也有引導卡片與按鈕，可一鍵跳轉設定頁；關閉後走路時地圖就會每秒即時更新！）</li>
     </ul>
 
     <h2>2. 五大偵測功能在看什麼？</h2>
