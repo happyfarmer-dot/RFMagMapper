@@ -310,38 +310,29 @@
 <!-- Built-in User Manual -->
 <section id="manualView" class="manual-panel">
   <div class="card">
-    <h2 style="margin-top:0;">RFMagMapper 完整操作說明書</h2>
-    <p><strong>RFMagMapper</strong> 是一套專為 <strong>Samsung Galaxy S24 Ultra</strong>（Android 14 / Target SDK 34）設計的室內無線射頻（Wi-Fi 7 / BLE）與 60Hz 低頻交變磁場熱區測繪系統，同時提供本瀏覽器版本進行互動模擬與 JSON 數據回放分析。</p>
+    <h2 style="margin-top:0;">RFMagMapper 使用說明書（白話版）</h2>
+    <p><strong>RFMagMapper</strong> 是一款幫你「看見家裡或辦公室看不見的無線訊號與電磁波」的測繪工具。只要拿著 <strong>Samsung Galaxy S24 Ultra</strong> 在室內走一圈，它就會畫出一張像氣象雲圖一樣的「熱區地圖」，告訴你哪裡 Wi-Fi 最強、哪裡有電線或變壓器產生的磁場。</p>
 
-    <h2>1. Android App 安裝與 S24 Ultra 最佳化設定</h2>
+    <h2>1. 手機版安裝與行前準備（S24 Ultra）</h2>
     <ul>
-      <li><strong>安裝 APK</strong>：下載 <code>RFMagMapper_S24Ultra.apk</code> 並允許「安裝未知應用程式」。</li>
-      <li><strong>授權動態權限</strong>：首次開啟請授權「精確位置 (Wi-Fi / GNSS L1+L5)」、「附近裝置 (BLE 掃描)」與「身體活動 (PDR 步數偵測)」。</li>
-      <li><strong>解除 Wi-Fi 掃描節流（關鍵）</strong>：Android 預設限制前景 Wi-Fi 掃描頻率（每 2 分鐘 4 次）。請至 S24 Ultra <code>設定 → 關於手機 → 軟體資訊 → 連點「版本號碼」7 次</code> 開啟開發人員選項，接著進入 <code>開發人員選項 → 關閉「Wi-Fi 掃描節流」</code>，即可每秒即時更新連續熱區！</li>
+      <li><strong>安裝 App</strong>：下載 <code>RFMagMapper_S24Ultra.apk</code> 到手機並點擊安裝（若跳出安全提醒請選擇允許）。</li>
+      <li><strong>開啟權限</strong>：第一次打開請點「立即授權所有權限」，讓 App 可以使用定位（讀取 Wi-Fi 與 GPS）、藍牙掃描與計步器。</li>
+      <li><strong>讓地圖即時更新（建議設定）</strong>：Android 預設會限制 Wi-Fi 掃描次數以省電。建議到手機 <code>設定 → 關於手機 → 軟體資訊 → 連點「版本號碼」7 下</code> 開啟開發人員選項，再進去把 <code>Wi-Fi 掃描節流</code> 關掉，走路時地圖就會每秒即時更新。</li>
     </ul>
 
-    <h2>2. 五大感測與物理運算原理</h2>
-    <h3>模組 A：Wi-Fi 7 三頻段線性毫瓦加總</h3>
-    <p>對數單位 dBm 不可直接算術平均。系統先將每顆基地台轉換為線性毫瓦功率加總後，再轉回總等效功率指數：</p>
-    <div class="formula-box">P_total_mW = Σ 10^(RSSI_i / 10)  →  P_total_dBm = 10 · log10(P_total_mW)</div>
-
-    <h3>模組 B：藍牙 BLE 環境射頻密度</h3>
-    <p>以 <code>SCAN_MODE_LOW_LATENCY</code> 連續掃描，維持 8 秒滑動視窗統計活躍發射源、最強單一裝置 RSSI 與線性總功率密度。</p>
-
-    <h3>模組 C：100 Hz 磁力計與 40 Hz 混疊 60Hz 帶通濾波</h3>
-    <p>在 100 Hz 採樣率（Nyquist 頻率 50 Hz）下，台灣/北美 60 Hz 市電交變磁場會混疊（Alias）折疊至 <code>|100 - 60| = 40 Hz</code>。系統在 X/Y/Z 三軸分別套用中心頻率 40 Hz（38–42 Hz，Q=10）二階 IIR 帶通濾波器，計算真有效值 RMS（μT），可精準定位微波爐、變壓器與牆內活電線。</p>
-
-    <h3>模組 D &amp; E：PDR 航位推算 + 氣壓計樓層 + GNSS L1+L5</h3>
+    <h2>2. 五大偵測功能在看什麼？</h2>
     <ul>
-      <li><strong>純陀螺儀航向</strong>：使用 <code>TYPE_GAME_ROTATION_VECTOR</code>（不含磁力計），避免變壓器或鋼筋磁場干擾行走方向。</li>
-      <li><strong>氣壓樓層偵測</strong>：透過 <code>TYPE_PRESSURE</code> 計算相對高度差 Δh，每 3.2 公尺自動標記樓層切換。</li>
-      <li><strong>雙頻 GNSS 錨點</strong>：靠近窗邊時記錄 L1 (1575.42 MHz) + L5 (1176.45 MHz) 雙頻座標與衛星 CN0。</li>
+      <li><strong>Wi-Fi 訊號強弱（支援 Wi-Fi 7）</strong>：把周圍所有 Wi-Fi（2.4G / 5G / 6G）的總能量加起來，並列出訊號最強的前 3 台路由器，方便你找訊號死角。</li>
+      <li><strong>藍牙裝置密度</strong>：看看周圍有多少藍牙設備（耳機、手錶、智慧家電）正在發射訊號。</li>
+      <li><strong>電器與牆內電線磁場（60Hz 低頻磁場）</strong>：家裡的微波爐、配電箱、變壓器或牆壁裡的電線，通電時會產生看不見的交流磁場。這個功能能幫你找出這些「電磁熱區」，避開長期坐在高磁場旁邊。</li>
+      <li><strong>室內走路定位與樓層判斷</strong>：室內收不到 GPS 沒關係，App 會用手機的計步器與陀螺儀記錄你往哪裡走了幾步；上下樓時氣壓計還會自動幫你切換樓層。</li>
+      <li><strong>窗邊／戶外 GPS 標記</strong>：靠近窗邊時自動記下經緯度，幫整張室內地圖做一個地理標記。</li>
     </ul>
 
-    <h2>3. 瀏覽器版操作方式</h2>
+    <h2>3. 瀏覽器版怎麼用？</h2>
     <ul>
-      <li><strong>互動模擬模式</strong>：點擊左側畫布任意位置，或按鍵盤 <code>W / A / S / D</code>（或方向鍵）移動，亦可點擊「▶ 自動巡檢模擬」觀察系統如何採樣並進行 0.5m IDW 空間熱區插值。</li>
-      <li><strong>Android JSON 回放分析</strong>：在手機端點擊「匯出 JSON」後，透過上方「匯入 Android JSON」按鈕上傳檔案，即可在電腦瀏覽器檢視四種圖層與熱區標註，並匯出高解析度 PNG。</li>
+      <li><strong>互動模擬</strong>：直接在左邊地圖上<strong>用滑鼠點擊</strong>，或按鍵盤 <code>W / A / S / D</code>（方向鍵）移動，也可以按「▶ 自動巡檢模擬」體驗熱區地圖的繪製過程。</li>
+      <li><strong>匯入手機數據回放</strong>：在手機端按「匯出 JSON」後，透過右上角「匯入 Android JSON」上傳檔案，就能在電腦大螢幕上檢視四種圖層並匯出 PNG 圖片。</li>
     </ul>
   </div>
 </section>
