@@ -27,6 +27,7 @@ class PdrBarometerEngine(context: Context) : SensorEventListener {
         context.applicationContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
     private val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+    private val linearAccel = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
     private val gameRotation = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
     private val barometer = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
 
@@ -41,12 +42,17 @@ class PdrBarometerEngine(context: Context) : SensorEventListener {
 
     private var baselineAltitudeMeters: Float? = null
     private var lastPressureEmitNs = 0L
+    private var lastHardwareStepMs = 0L
+    private var lastAccelStepMs = 0L
 
     var onStepCallback: ((PdrState) -> Unit)? = null
 
     fun start() {
         stepDetector?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST)
+        }
+        linearAccel?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
         gameRotation?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
@@ -107,7 +113,23 @@ class PdrBarometerEngine(context: Context) : SensorEventListener {
             }
 
             Sensor.TYPE_STEP_DETECTOR -> {
+                lastHardwareStepMs = System.currentTimeMillis()
                 advanceOneStep()
+            }
+
+            Sensor.TYPE_LINEAR_ACCELERATION -> {
+                val now = System.currentTimeMillis()
+                // Fallback for slow indoor walking when hardware step detector hasn't fired recently
+                if (now - lastHardwareStepMs > 1200L && now - lastAccelStepMs > 420L) {
+                    val ax = event.values[0]
+                    val ay = event.values[1]
+                    val az = event.values[2]
+                    val mag = kotlin.math.sqrt((ax * ax + ay * ay + az * az).toDouble())
+                    if (mag > 1.45) {
+                        lastAccelStepMs = now
+                        advanceOneStep()
+                    }
+                }
             }
 
             Sensor.TYPE_PRESSURE -> {

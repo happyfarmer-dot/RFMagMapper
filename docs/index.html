@@ -215,10 +215,8 @@
   <div class="nav-actions">
     <button id="btnViewMap" class="active-tab" onclick="switchView('map')">測繪儀表板</button>
     <button id="btnViewManual" onclick="switchView('manual')">使用說明書</button>
-    <label class="btn" for="jsonFileInput">匯入 Android JSON</label>
-    <input id="jsonFileInput" type="file" accept=".json" onchange="handleJsonUpload(event)" />
+    <button id="btnSensorWalk" onclick="togglePhoneSensorWalk()">📱 手機實地步行</button>
     <button onclick="exportCanvasPng()">匯出 PNG</button>
-    <a class="btn" href="https://github.com/happyfarmer-dot/RFMagMapper" target="_blank">GitHub 專案</a>
   </div>
 </header>
 
@@ -769,6 +767,75 @@ function exportCanvasPng() {
   link.download = `RFMagMapper_Web_${currentLayer}.png`;
   link.href = canvas.toDataURL("image/png");
   link.click();
+}
+
+// Phone browser real-world walking (DeviceMotion + DeviceOrientation)
+let phoneWalkActive = false;
+let phoneHeadingRad = 0;
+let phoneHeadingOffset = null;
+let lastStepTimeMs = 0;
+let accelAvg = 9.81;
+
+function handleOrientation(e) {
+  if (e.alpha == null) return;
+  const rad = (360 - e.alpha) * (Math.PI / 180);
+  if (phoneHeadingOffset === null) phoneHeadingOffset = rad;
+  phoneHeadingRad = rad - phoneHeadingOffset;
+}
+
+function handleMotion(e) {
+  const acc = e.accelerationIncludingGravity || e.acceleration;
+  if (!acc) return;
+  const mag = Math.hypot(acc.x || 0, acc.y || 0, acc.z || 0);
+  accelAvg = 0.9 * accelAvg + 0.1 * mag;
+  const delta = mag - accelAvg;
+  const now = Date.now();
+  // Detect step peak (> 1.35 m/s^2 above gravity baseline, min 380ms between steps)
+  if (delta > 1.35 && now - lastStepTimeMs > 380) {
+    lastStepTimeMs = now;
+    const stepLen = 0.65;
+    const nx = curPos.x + stepLen * Math.sin(phoneHeadingRad);
+    const ny = curPos.y + stepLen * Math.cos(phoneHeadingRad);
+    moveTo(nx, ny);
+  }
+}
+
+async function togglePhoneSensorWalk() {
+  const btn = document.getElementById("btnSensorWalk");
+  if (phoneWalkActive) {
+    window.removeEventListener("deviceorientation", handleOrientation);
+    window.removeEventListener("devicemotion", handleMotion);
+    phoneWalkActive = false;
+    btn.textContent = "📱 手機實地步行";
+    btn.classList.remove("danger");
+    document.getElementById("modeLabel").textContent = "互動模擬環境";
+    return;
+  }
+
+  try {
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      const res = await DeviceMotionEvent.requestPermission();
+      if (res !== "granted") {
+        alert("請允許動作與方向感測器權限，才能偵測步行移動。");
+        return;
+      }
+    }
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+      await DeviceOrientationEvent.requestPermission();
+    }
+  } catch (err) {
+    console.warn(err);
+  }
+
+  if (autoPatrolTimer) toggleAutoPatrol();
+  isReplayMode = false;
+  phoneHeadingOffset = null;
+  window.addEventListener("deviceorientation", handleOrientation);
+  window.addEventListener("devicemotion", handleMotion);
+  phoneWalkActive = true;
+  btn.textContent = "■ 停止實地步行";
+  btn.classList.add("danger");
+  document.getElementById("modeLabel").textContent = "手機感測器實地步行中";
 }
 
 // Init
