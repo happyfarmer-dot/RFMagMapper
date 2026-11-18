@@ -1,6 +1,10 @@
 # RFMagMapper — 室內無線射頻 RF 與 60Hz 低頻磁場熱區測繪儀
 
-專為 **Samsung Galaxy S24 Ultra** (Android 14 / Target SDK 34, Min SDK 31) 打造的原生 Kotlin + Jetpack Compose 室內電磁與射頻環境測繪應用。
+專為 **Samsung Galaxy S24 Ultra** (Android 14 / Target SDK 34, Min SDK 31) 打造的原生 Kotlin + Jetpack Compose 室內電磁與射頻環境測繪應用，並附帶 **瀏覽器互動模擬與 JSON 回放分析版**。
+
+- 🌐 **線上瀏覽器版 (GitHub Pages)**：https://happyfarmer-dot.github.io/RFMagMapper/
+- 📖 **完整操作說明書**：[MANUAL.md](MANUAL.md)
+- 📦 **Android APK 下載 (S24 Ultra)**：[Google Drive (RFMagMapper_S24Ultra.apk)](https://drive.google.com/file/d/1uWd505tMAyAwpCE2Mz0x0q61R0EVrQPR/view?usp=drivesdk)
 
 ## 核心五大採集模組
 1. **模組 A · Wi-Fi 7 三頻段 (2.4G / 5G / 6GHz) 射頻能量掃描 (`WifiScannerEngine`)**

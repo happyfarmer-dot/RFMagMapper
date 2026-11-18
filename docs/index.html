@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RFMagMapper Web — 室內射頻與 60Hz 磁場熱區測繪儀</title>
+  <style>
+    :root {
+      --bg-deep: #0B1220;
+      --surface: #131C2E;
+      --surface-elev: #1C2840;
+      --cyan: #00E5FF;
+      --green: #00E676;
+      --yellow: #FFEA00;
+      --red: #FF1744;
+      --text: #F1F5F9;
+      --muted: #94A3B8;
+      --border: #253451;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+      background: var(--bg-deep);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+    }
+    .brand h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px; }
+    .brand small { display: block; font-size: 0.75rem; color: var(--muted); }
+    .nav-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button, .btn {
+      background: var(--surface-elev);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover, .btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    button.primary { background: var(--cyan); color: var(--bg-deep); border-color: var(--cyan); }
+    button.primary:hover { filter: brightness(1.1); color: var(--bg-deep); }
+    button.danger { background: var(--red); color: #fff; border-color: var(--red); }
+    button.active-tab { background: var(--cyan); color: var(--bg-deep); border-color: var(--cyan); }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 980px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .layer-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .layer-tabs button { justify-content: center; padding: 8px 6px; font-size: 0.78rem; }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 500px;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+    .overlay-badge {
+      position: absolute;
+      top: 10px; left: 10px;
+      background: rgba(19, 28, 46, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      pointer-events: none;
+    }
+    .overlay-hint {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: rgba(19, 28, 46, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .legend-bar {
+      position: absolute;
+      bottom: 10px; left: 10px; right: 10px;
+      background: rgba(19, 28, 46, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.75rem;
+    }
+    .legend-grad {
+      flex: 1; height: 8px; border-radius: 4px;
+      background: linear-gradient(90deg, var(--green), var(--yellow), var(--red));
+    }
+
+    .controls-row {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .metric-box {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .metric-box .label { font-size: 0.7rem; color: var(--muted); }
+    .metric-box .val { font-size: 0.95rem; font-weight: 700; margin-top: 2px; }
+
+    .ap-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.78rem; padding: 4px 0;
+      border-bottom: 1px dashed rgba(148, 163, 184, 0.15);
+    }
+    .ap-row:last-child { border-bottom: none; }
+
+    .side-col { display: flex; flex-direction: column; gap: 12px; }
+
+    .manual-panel {
+      display: none;
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 16px 40px;
+    }
+    .manual-panel.visible { display: block; }
+    .manual-panel h2 { color: var(--cyan); margin: 18px 0 8px; font-size: 1.1rem; }
+    .manual-panel h3 { color: var(--yellow); margin: 14px 0 6px; font-size: 0.95rem; }
+    .manual-panel p, .manual-panel li { color: #CBD5E1; font-size: 0.88rem; margin-bottom: 6px; }
+    .manual-panel ul { padding-left: 20px; }
+    .manual-panel code {
+      background: var(--bg-deep); padding: 2px 6px; border-radius: 4px; color: var(--cyan);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem;
+    }
+    .formula-box {
+      background: var(--bg-deep); border-left: 3px solid var(--cyan);
+      padding: 10px 14px; border-radius: 6px; margin: 8px 0;
+      font-family: ui-monospace, monospace; font-size: 0.82rem; color: #E2E8F0;
+    }
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <div>
+      <h1>RFMagMapper Web</h1>
+      <small>室內無線射頻 RF 與 60Hz 低頻磁場熱區測繪儀（瀏覽器互動模擬 &amp; JSON 分析版）</small>
+    </div>
+  </div>
+  <div class="nav-actions">
+    <button id="btnViewMap" class="active-tab" onclick="switchView('map')">測繪儀表板</button>
+    <button id="btnViewManual" onclick="switchView('manual')">使用說明書</button>
+    <label class="btn" for="jsonFileInput">匯入 Android JSON</label>
+    <input id="jsonFileInput" type="file" accept=".json" onchange="handleJsonUpload(event)" />
+    <button onclick="exportCanvasPng()">匯出 PNG</button>
+    <a class="btn" href="https://github.com/happyfarmer-dot/RFMagMapper" target="_blank">GitHub 專案</a>
+  </div>
+</header>
+
+<main id="mapView" class="container">
+  <!-- Left: Interactive Heatmap -->
+  <section class="card">
+    <div class="layer-tabs">
+      <button class="active-tab" data-layer="COMPOSITE" onclick="selectLayer('COMPOSITE', this)">綜合指數 (0–100)</button>
+      <button data-layer="WIFI" onclick="selectLayer('WIFI', this)">Wi-Fi RF (dBm)</button>
+      <button data-layer="BLE" onclick="selectLayer('BLE', this)">BLE 密度</button>
+      <button data-layer="MAG_60HZ" onclick="selectLayer('MAG_60HZ', this)">60Hz 磁場 (μT)</button>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="heatmapCanvas"></canvas>
+      <div class="overlay-badge" id="overlayBadge">
+        <strong style="color:var(--cyan)">綜合指數 · 1F</strong><br>
+        <span style="color:var(--muted)">網格 0.5m × 0.5m · 採樣點 0</span>
+      </div>
+      <div class="overlay-hint">點擊地圖移動 / 鍵盤 WASD 步行 / 滾輪縮放</div>
+      <div class="legend-bar">
+        <span style="color:var(--green);font-weight:700;">低輻射</span>
+        <div class="legend-grad"></div>
+        <span style="color:var(--red);font-weight:700;">高強度熱區</span>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <button id="btnPatrol" class="primary" onclick="toggleAutoPatrol()">▶ 自動巡檢模擬</button>
+      <button onclick="stepRandom()">+1 步移動</button>
+      <button onclick="resetSimulation()">清除重設</button>
+      <span style="font-size:0.78rem;color:var(--muted);margin-left:auto;">
+        模式：<strong id="modeLabel" style="color:var(--cyan)">互動模擬環境</strong>
+      </span>
+    </div>
+  </section>
+
+  <!-- Right: 5-Module Telemetry -->
+  <aside class="side-col">
+    <!-- Module A -->
+    <div class="card">
+      <div class="card-title">
+        <span>模組 A · Wi-Fi 7 三頻段線性功率</span>
+        <span id="wifiBandDist" style="font-size:0.72rem;color:var(--muted)">2.4G: 0 · 5G: 0 · 6G: 0</span>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-box"><div class="label">總等效功率</div><div class="val" id="wifiDbm">-- dBm</div></div>
+        <div class="metric-box"><div class="label">線性總功率</div><div class="val" id="wifiMw">-- mW</div></div>
+        <div class="metric-box"><div class="label">偵測熱點</div><div class="val" id="wifiCount">0</div></div>
+      </div>
+      <div id="wifiTop3" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- Module B -->
+    <div class="card">
+      <div class="card-title"><span>模組 B · 藍牙 BLE 環境射頻密度</span></div>
+      <div class="metrics-grid">
+        <div class="metric-box"><div class="label">活躍發射源</div><div class="val" id="bleCount">0 台</div></div>
+        <div class="metric-box"><div class="label">最強 RSSI</div><div class="val" id="bleMax">-- dBm</div></div>
+        <div class="metric-box"><div class="label">總功率密度</div><div class="val" id="bleMw">-- mW</div></div>
+      </div>
+    </div>
+
+    <!-- Module C -->
+    <div class="card">
+      <div class="card-title">
+        <span>模組 C · 60Hz AC 磁場 (40Hz IIR 混疊)</span>
+        <span style="font-size:0.72rem;color:var(--muted)">100 Hz 採樣</span>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-box"><div class="label">60Hz AC RMS</div><div class="val" id="magAc" style="color:var(--yellow)">0.00 μT</div></div>
+        <div class="metric-box"><div class="label">DC 異常 ΔB</div><div class="val" id="magDc">0.00 μT</div></div>
+        <div class="metric-box"><div class="label">綜合指數</div><div class="val" id="compIdx" style="color:var(--cyan)">0</div></div>
+      </div>
+    </div>
+
+    <!-- Module D & E -->
+    <div class="card">
+      <div class="card-title"><span>模組 D/E · PDR 座標與 GNSS 基準錨點</span></div>
+      <div class="metrics-grid">
+        <div class="metric-box"><div class="label">PDR 座標</div><div class="val" id="pdrCoord">(0.0, 0.0)m</div></div>
+        <div class="metric-box"><div class="label">樓層</div><div class="val" id="pdrFloor">1F</div></div>
+        <div class="metric-box"><div class="label">GNSS L1+L5</div><div class="val" id="gnssStatus" style="font-size:0.78rem;">模擬基準點</div></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- Built-in User Manual -->
+<section id="manualView" class="manual-panel">
+  <div class="card">
+    <h2 style="margin-top:0;">RFMagMapper 完整操作說明書</h2>
+    <p><strong>RFMagMapper</strong> 是一套專為 <strong>Samsung Galaxy S24 Ultra</strong>（Android 14 / Target SDK 34）設計的室內無線射頻（Wi-Fi 7 / BLE）與 60Hz 低頻交變磁場熱區測繪系統，同時提供本瀏覽器版本進行互動模擬與 JSON 數據回放分析。</p>
+
+    <h2>1. Android App 安裝與 S24 Ultra 最佳化設定</h2>
+    <ul>
+      <li><strong>安裝 APK</strong>：下載 <code>RFMagMapper_S24Ultra.apk</code> 並允許「安裝未知應用程式」。</li>
+      <li><strong>授權動態權限</strong>：首次開啟請授權「精確位置 (Wi-Fi / GNSS L1+L5)」、「附近裝置 (BLE 掃描)」與「身體活動 (PDR 步數偵測)」。</li>
+      <li><strong>解除 Wi-Fi 掃描節流（關鍵）</strong>：Android 預設限制前景 Wi-Fi 掃描頻率（每 2 分鐘 4 次）。請至 S24 Ultra <code>設定 → 關於手機 → 軟體資訊 → 連點「版本號碼」7 次</code> 開啟開發人員選項，接著進入 <code>開發人員選項 → 關閉「Wi-Fi 掃描節流」</code>，即可每秒即時更新連續熱區！</li>
+    </ul>
+
+    <h2>2. 五大感測與物理運算原理</h2>
+    <h3>模組 A：Wi-Fi 7 三頻段線性毫瓦加總</h3>
+    <p>對數單位 dBm 不可直接算術平均。系統先將每顆基地台轉換為線性毫瓦功率加總後，再轉回總等效功率指數：</p>
+    <div class="formula-box">P_total_mW = Σ 10^(RSSI_i / 10)  →  P_total_dBm = 10 · log10(P_total_mW)</div>
+
+    <h3>模組 B：藍牙 BLE 環境射頻密度</h3>
+    <p>以 <code>SCAN_MODE_LOW_LATENCY</code> 連續掃描，維持 8 秒滑動視窗統計活躍發射源、最強單一裝置 RSSI 與線性總功率密度。</p>
+
+    <h3>模組 C：100 Hz 磁力計與 40 Hz 混疊 60Hz 帶通濾波</h3>
+    <p>在 100 Hz 採樣率（Nyquist 頻率 50 Hz）下，台灣/北美 60 Hz 市電交變磁場會混疊（Alias）折疊至 <code>|100 - 60| = 40 Hz</code>。系統在 X/Y/Z 三軸分別套用中心頻率 40 Hz（38–42 Hz，Q=10）二階 IIR 帶通濾波器，計算真有效值 RMS（μT），可精準定位微波爐、變壓器與牆內活電線。</p>
+
+    <h3>模組 D &amp; E：PDR 航位推算 + 氣壓計樓層 + GNSS L1+L5</h3>
+    <ul>
+      <li><strong>純陀螺儀航向</strong>：使用 <code>TYPE_GAME_ROTATION_VECTOR</code>（不含磁力計），避免變壓器或鋼筋磁場干擾行走方向。</li>
+      <li><strong>氣壓樓層偵測</strong>：透過 <code>TYPE_PRESSURE</code> 計算相對高度差 Δh，每 3.2 公尺自動標記樓層切換。</li>
+      <li><strong>雙頻 GNSS 錨點</strong>：靠近窗邊時記錄 L1 (1575.42 MHz) + L5 (1176.45 MHz) 雙頻座標與衛星 CN0。</li>
+    </ul>
+
+    <h2>3. 瀏覽器版操作方式</h2>
+    <ul>
+      <li><strong>互動模擬模式</strong>：點擊左側畫布任意位置，或按鍵盤 <code>W / A / S / D</code>（或方向鍵）移動，亦可點擊「▶ 自動巡檢模擬」觀察系統如何採樣並進行 0.5m IDW 空間熱區插值。</li>
+      <li><strong>Android JSON 回放分析</strong>：在手機端點擊「匯出 JSON」後，透過上方「匯入 Android JSON」按鈕上傳檔案，即可在電腦瀏覽器檢視四種圖層與熱區標註，並匯出高解析度 PNG。</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+// Virtual indoor sources for interactive browser simulation (8m x 8m room)
+const VIRTUAL_WIFI_APS = [
+  { ssid: "ASUS_ROG_WiFi7_6G", bssid: "A0:36:BC:11:22:01", band: "6G", freq: 6175, x: -3.0, y: 2.5, txDbm: -28 },
+  { ssid: "Home_Mesh_5G", bssid: "B4:2E:99:44:55:02", band: "5G", freq: 5180, x: 2.5, y: -2.0, txDbm: -34 },
+  { ssid: "IoT_Gateway_24G", bssid: "C8:7F:54:88:99:03", band: "2.4G", freq: 2437, x: -1.5, y: -3.0, txDbm: -38 },
+  { ssid: "Neighbor_5G", bssid: "D2:11:22:33:44:04", band: "5G", freq: 5745, x: 5.5, y: 4.0, txDbm: -45 }
+];
+
+const VIRTUAL_MAG_SOURCES = [
+  { name: "配電箱/變壓器", x: 3.0, y: 2.5, strengthUt: 14.5 },
+  { name: "微波爐/廚房暗管", x: -2.8, y: -2.2, strengthUt: 11.2 }
+];
+
+const VIRTUAL_BLE_CLUSTERS = [
+  { x: 0.5, y: 1.0, count: 14, baseRssi: -52 },
+  { x: -2.5, y: 2.0, count: 8, baseRssi: -58 }
+];
+
+let currentLayer = "COMPOSITE";
+let samples = [];
+let trajectory = [{ x: 0, y: 0, floor: 1 }];
+let curPos = { x: 0, y: 0, floor: 1 };
+let scalePx = 44;
+let pan = { x: 0, y: 0 };
+let autoPatrolTimer = null;
+let gnssMeta = { hasFix: false, text: "模擬基準點" };
+let isReplayMode = false;
+
+const canvas = document.getElementById("heatmapCanvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = rect.height * window.devicePixelRatio;
+  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  render();
+}
+window.addEventListener("resize", resizeCanvas);
+
+function dbmToMw(dbm) { return Math.pow(10, dbm / 10); }
+function mwToDbm(mw) { return mw <= 1e-11 ? -110 : 10 * Math.log10(mw); }
+
+function simulateSampleAt(x, y) {
+  const aps = VIRTUAL_WIFI_APS.map(ap => {
+    const d = Math.max(0.4, Math.hypot(x - ap.x, y - ap.y));
+    const pathLoss = 18 * Math.log10(d) + (Math.random() - 0.5) * 2.0;
+    const rssi = Math.round(ap.txDbm - pathLoss);
+    return { ...ap, rssiDbm: rssi, powerMw: dbmToMw(rssi) };
+  }).sort((a, b) => b.rssiDbm - a.rssiDbm);
+
+  const totalMw = aps.reduce((s, a) => s + a.powerMw, 0);
+  const totalDbm = mwToDbm(totalMw);
+
+  let bleCount = 3;
+  let bleMax = -82;
+  let bleMw = 0;
+  for (const c of VIRTUAL_BLE_CLUSTERS) {
+    const d = Math.max(0.5, Math.hypot(x - c.x, y - c.y));
+    if (d < 4.5) {
+      bleCount += Math.round(c.count * Math.max(0.2, 1 - d / 5.0));
+      const r = Math.round(c.baseRssi - 12 * Math.log10(d));
+      if (r > bleMax) bleMax = r;
+      bleMw += dbmToMw(r) * 3;
+    }
+  }
+
+  let ac60 = 0.4 + Math.random() * 0.3;
+  let dcAnom = 0.8 + Math.random() * 0.4;
+  for (const m of VIRTUAL_MAG_SOURCES) {
+    const d = Math.max(0.35, Math.hypot(x - m.x, y - m.y));
+    ac60 += m.strengthUt / (1 + d * d * 0.85);
+    dcAnom += (m.strengthUt * 0.6) / (1 + d * d);
+  }
+
+  const wifiNorm = Math.min(1, Math.max(0, (totalDbm + 90) / 65));
+  const bleNorm = 0.6 * Math.min(1, bleCount / 25) + 0.4 * Math.min(1, (mwToDbm(bleMw) + 95) / 60);
+  const magNorm = Math.min(1, Math.max(0, ac60 / 15));
+  const composite = (0.4 * wifiNorm + 0.2 * bleNorm + 0.4 * magNorm) * 100;
+
+  return {
+    x, y, floor: 1,
+    timestampMs: Date.now(),
+    wifiTotalDbm: totalDbm,
+    wifiTotalMw: totalMw,
+    wifiApCount: aps.length,
+    wifiTop3: aps.slice(0, 3),
+    bleCount, bleMaxRssi: bleMax, bleTotalMw: bleMw,
+    acMag60HzRmsUt: ac60, dcMagAnomalyUt: dcAnom,
+    compositeIndex: composite
+  };
+}
+
+function updateTelemetryUI(s) {
+  if (!s) return;
+  document.getElementById("wifiDbm").textContent = s.wifiTotalDbm.toFixed(1) + " dBm";
+  document.getElementById("wifiMw").textContent = s.wifiTotalMw.toExponential(2) + " mW";
+  document.getElementById("wifiCount").textContent = s.wifiApCount;
+
+  const b24 = (s.wifiTop3 || []).filter(a => a.band === "2.4G").length;
+  const b5 = (s.wifiTop3 || []).filter(a => a.band === "5G").length;
+  const b6 = (s.wifiTop3 || []).filter(a => a.band === "6G").length;
+  document.getElementById("wifiBandDist").textContent = `Top3 頻段: 2.4G(${b24}) 5G(${b5}) 6G(${b6})`;
+
+  const topEl = document.getElementById("wifiTop3");
+  topEl.innerHTML = (s.wifiTop3 || []).map((ap, i) => `
+    <div class="ap-row">
+      <span>${i + 1}. ${ap.ssid} <strong style="color:var(--cyan)">[${ap.band}]</strong></span>
+      <span style="color:${ap.rssiDbm >= -50 ? 'var(--red)' : 'var(--green)'};font-weight:700;">${ap.rssiDbm} dBm</span>
+    </div>
+  `).join("");
+
+  document.getElementById("bleCount").textContent = s.bleCount + " 台";
+  document.getElementById("bleMax").textContent = s.bleMaxRssi + " dBm";
+  document.getElementById("bleMw").textContent = s.bleTotalMw.toExponential(2) + " mW";
+
+  document.getElementById("magAc").textContent = s.acMag60HzRmsUt.toFixed(2) + " μT";
+  document.getElementById("magDc").textContent = s.dcMagAnomalyUt.toFixed(2) + " μT";
+  document.getElementById("compIdx").textContent = Math.round(s.compositeIndex);
+  document.getElementById("pdrCoord").textContent = `(${s.x.toFixed(1)}, ${s.y.toFixed(1)})m`;
+  document.getElementById("pdrFloor").textContent = `${s.floor}F`;
+}
+
+function extractVal(s, layer) {
+  if (layer === "COMPOSITE") return s.compositeIndex;
+  if (layer === "WIFI") return s.wifiTotalDbm;
+  if (layer === "BLE") return s.bleCount;
+  return s.acMag60HzRmsUt;
+}
+
+function normVal(v, layer) {
+  if (layer === "COMPOSITE") return Math.min(1, Math.max(0, v / 100));
+  if (layer === "WIFI") return Math.min(1, Math.max(0, (v + 90) / 60));
+  if (layer === "BLE") return Math.min(1, Math.max(0, v / 25));
+  return Math.min(1, Math.max(0, v / 15));
+}
+
+function formatHotspot(v, layer) {
+  if (layer === "COMPOSITE") return `高負荷熱區 ${Math.round(v)}`;
+  if (layer === "WIFI") return `Wi-Fi 強訊號 ${Math.round(v)} dBm`;
+  if (layer === "BLE") return `BLE 密集區 ${Math.round(v)} 台`;
+  return `60Hz 變壓器熱區 ${v.toFixed(1)} μT`;
+}
+
+function heatColor(t, alpha = 0.55) {
+  const c = Math.min(1, Math.max(0, t));
+  let r, g, b;
+  if (c < 0.5) {
+    const k = c / 0.5;
+    r = Math.round(255 * k);
+    g = Math.round(230 + 4 * k);
+    b = Math.round(118 * (1 - k));
+  } else {
+    const k = (c - 0.5) / 0.5;
+    r = 255;
+    g = Math.round(234 + (23 - 234) * k);
+    b = Math.round(68 * k);
+  }
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function interpolateGrid() {
+  if (samples.length === 0) return { cells: [], hotspots: [] };
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const s of samples) {
+    if (s.x < minX) minX = s.x; if (s.x > maxX) maxX = s.x;
+    if (s.y < minY) minY = s.y; if (s.y > maxY) maxY = s.y;
+  }
+  const pad = 2.25, step = 0.5;
+  const cells = [];
+  for (let wx = Math.floor((minX - pad) / step) * step; wx <= maxX + pad; wx += step) {
+    for (let wy = Math.floor((minY - pad) / step) * step; wy <= maxY + pad; wy += step) {
+      let wSum = 0, wTot = 0, near = false;
+      for (const s of samples) {
+        const d = Math.hypot(wx - s.x, wy - s.y);
+        if (d <= 3.0) {
+          near = true;
+          const w = 1 / (d * d + 1e-4);
+          wSum += w * extractVal(s, currentLayer);
+          wTot += w;
+        }
+      }
+      if (near && wTot > 0) {
+        const raw = wSum / wTot;
+        cells.push({ wx, wy, raw, norm: normVal(raw, currentLayer) });
+      }
+    }
+  }
+  const hotspots = [];
+  const reds = cells.filter(c => c.norm >= 0.65).sort((a, b) => b.norm - a.norm);
+  for (const c of reds) {
+    if (!hotspots.some(h => Math.hypot(h.wx - c.wx, h.wy - c.wy) < 2.5)) {
+      hotspots.push({ wx: c.wx, wy: c.wy, label: formatHotspot(c.raw, currentLayer) });
+      if (hotspots.length >= 5) break;
+    }
+  }
+  return { cells, hotspots };
+}
+
+function render() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2 + pan.x;
+  const cy = h / 2 + pan.y;
+  const toScreen = (wx, wy) => ({ x: cx + wx * scalePx, y: cy - wy * scalePx });
+
+  // 0.5m Grid
+  const minWx = (-cx / scalePx) - 1, maxWx = ((w - cx) / scalePx) + 1;
+  const minWy = ((cy - h) / scalePx) - 1, maxWy = (cy / scalePx) + 1;
+  for (let gx = Math.floor(minWx * 2); gx <= Math.ceil(maxWx * 2); gx++) {
+    const sx = cx + (gx * 0.5) * scalePx;
+    ctx.strokeStyle = gx % 2 === 0 ? "#1E293B" : "#131C2E";
+    ctx.lineWidth = gx % 2 === 0 ? 1.2 : 0.7;
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+  }
+  for (let gy = Math.floor(minWy * 2); gy <= Math.ceil(maxWy * 2); gy++) {
+    const sy = cy - (gy * 0.5) * scalePx;
+    ctx.strokeStyle = gy % 2 === 0 ? "#1E293B" : "#131C2E";
+    ctx.lineWidth = gy % 2 === 0 ? 1.2 : 0.7;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+  }
+
+  // IDW Heatmap
+  const { cells, hotspots } = interpolateGrid();
+  const blobR = 0.5 * scalePx * 0.95;
+  for (const c of cells) {
+    const p = toScreen(c.wx, c.wy);
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, blobR);
+    grad.addColorStop(0, heatColor(c.norm, 0.58));
+    grad.addColorStop(1, heatColor(c.norm, 0.0));
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(p.x, p.y, blobR, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Trajectory
+  if (trajectory.length >= 2) {
+    ctx.strokeStyle = "#00E5FF";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    const p0 = toScreen(trajectory[0].x, trajectory[0].y);
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < trajectory.length; i++) {
+      const pi = toScreen(trajectory[i].x, trajectory[i].y);
+      ctx.lineTo(pi.x, pi.y);
+    }
+    ctx.stroke();
+  }
+
+  // Hotspots
+  ctx.font = "bold 12px sans-serif";
+  for (const hs of hotspots) {
+    const p = toScreen(hs.wx, hs.wy);
+    ctx.fillStyle = "rgba(255, 23, 68, 0.3)";
+    ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#FF1744";
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
+
+    const tw = ctx.measureText(hs.label).width;
+    ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+    ctx.fillRect(p.x - tw / 2 - 6, p.y - 32, tw + 12, 20);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(hs.label, p.x - tw / 2, p.y - 18);
+  }
+
+  // Current cursor
+  const cur = toScreen(curPos.x, curPos.y);
+  ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
+  ctx.beginPath(); ctx.arc(cur.x, cur.y, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#00E5FF";
+  ctx.beginPath(); ctx.arc(cur.x, cur.y, 5.5, 0, Math.PI * 2); ctx.fill();
+
+  const layerNames = { COMPOSITE: "綜合指數", WIFI: "Wi-Fi RF", BLE: "BLE 密度", MAG_60HZ: "60Hz 磁場" };
+  document.getElementById("overlayBadge").innerHTML =
+    `<strong style="color:var(--cyan)">${layerNames[currentLayer]} · ${curPos.floor}F</strong><br>` +
+    `<span style="color:var(--muted)">網格 0.5m × 0.5m · 採樣點 ${samples.length} · 熱點 ${hotspots.length}</span>`;
+}
+
+function moveTo(wx, wy) {
+  if (isReplayMode) return;
+  curPos.x = wx;
+  curPos.y = wy;
+  trajectory.push({ x: wx, y: wy, floor: 1 });
+  const s = simulateSampleAt(wx, wy);
+  samples.push(s);
+  updateTelemetryUI(s);
+  render();
+}
+
+canvas.addEventListener("click", (e) => {
+  if (isReplayMode) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const cx = rect.width / 2 + pan.x;
+  const cy = rect.height / 2 + pan.y;
+  const wx = (sx - cx) / scalePx;
+  const wy = (cy - sy) / scalePx;
+  moveTo(wx, wy);
+});
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  scalePx = Math.min(120, Math.max(18, scalePx * (e.deltaY < 0 ? 1.1 : 0.9)));
+  render();
+}, { passive: false });
+
+window.addEventListener("keydown", (e) => {
+  if (isReplayMode) return;
+  const step = 0.65;
+  if (e.key === "w" || e.key === "W" || e.key === "ArrowUp") moveTo(curPos.x, curPos.y + step);
+  if (e.key === "s" || e.key === "S" || e.key === "ArrowDown") moveTo(curPos.x, curPos.y - step);
+  if (e.key === "a" || e.key === "A" || e.key === "ArrowLeft") moveTo(curPos.x - step, curPos.y);
+  if (e.key === "d" || e.key === "D" || e.key === "ArrowRight") moveTo(curPos.x + step, curPos.y);
+});
+
+function stepRandom() {
+  const angle = Math.random() * Math.PI * 2;
+  const nx = Math.max(-4.5, Math.min(4.5, curPos.x + 0.65 * Math.cos(angle)));
+  const ny = Math.max(-4.5, Math.min(4.5, curPos.y + 0.65 * Math.sin(angle)));
+  moveTo(nx, ny);
+}
+
+let patrolAngle = 0;
+function toggleAutoPatrol() {
+  const btn = document.getElementById("btnPatrol");
+  if (autoPatrolTimer) {
+    clearInterval(autoPatrolTimer);
+    autoPatrolTimer = null;
+    btn.textContent = "▶ 自動巡檢模擬";
+    btn.classList.remove("danger");
+    btn.classList.add("primary");
+  } else {
+    isReplayMode = false;
+    document.getElementById("modeLabel").textContent = "互動模擬環境";
+    btn.textContent = "■ 停止巡檢";
+    btn.classList.remove("primary");
+    btn.classList.add("danger");
+    autoPatrolTimer = setInterval(() => {
+      patrolAngle += 0.35;
+      const r = 1.5 + 1.8 * Math.sin(patrolAngle * 0.4);
+      moveTo(r * Math.cos(patrolAngle), r * Math.sin(patrolAngle));
+    }, 450);
+  }
+}
+
+function resetSimulation() {
+  if (autoPatrolTimer) toggleAutoPatrol();
+  isReplayMode = false;
+  document.getElementById("modeLabel").textContent = "互動模擬環境";
+  document.getElementById("gnssStatus").textContent = "模擬基準點";
+  samples = [];
+  trajectory = [{ x: 0, y: 0, floor: 1 }];
+  curPos = { x: 0, y: 0, floor: 1 };
+  const s0 = simulateSampleAt(0, 0);
+  samples.push(s0);
+  updateTelemetryUI(s0);
+  render();
+}
+
+function selectLayer(layer, btn) {
+  currentLayer = layer;
+  document.querySelectorAll(".layer-tabs button").forEach(b => b.classList.remove("active-tab"));
+  btn.classList.add("active-tab");
+  render();
+}
+
+function switchView(view) {
+  const mapEl = document.getElementById("mapView");
+  const manEl = document.getElementById("manualView");
+  const bMap = document.getElementById("btnViewMap");
+  const bMan = document.getElementById("btnViewManual");
+  if (view === "manual") {
+    mapEl.style.display = "none";
+    manEl.classList.add("visible");
+    bMan.classList.add("active-tab");
+    bMap.classList.remove("active-tab");
+  } else {
+    mapEl.style.display = "grid";
+    manEl.classList.remove("visible");
+    bMap.classList.add("active-tab");
+    bMan.classList.remove("active-tab");
+    resizeCanvas();
+  }
+}
+
+function handleJsonUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (autoPatrolTimer) toggleAutoPatrol();
+      isReplayMode = true;
+      document.getElementById("modeLabel").textContent = `JSON 回放 (${file.name})`;
+      samples = (data.samples || []).map(s => ({
+        x: s.xMeters, y: s.yMeters, floor: s.floor || 1,
+        timestampMs: s.timestampMs,
+        wifiTotalDbm: s.wifiTotalDbm, wifiTotalMw: s.wifiTotalMw, wifiApCount: s.wifiApCount,
+        wifiTop3: s.wifiTop3 || [],
+        bleCount: s.bleCount, bleMaxRssi: s.bleMaxRssi, bleTotalMw: s.bleTotalMw,
+        acMag60HzRmsUt: s.acMag60HzRmsUt, dcMagAnomalyUt: s.dcMagAnomalyUt,
+        compositeIndex: s.compositeIndex
+      }));
+      trajectory = samples.map(s => ({ x: s.x, y: s.y, floor: s.floor }));
+      if (samples.length > 0) {
+        const last = samples[samples.length - 1];
+        curPos = { x: last.x, y: last.y, floor: last.floor };
+        updateTelemetryUI(last);
+      }
+      if (data.gnssAnchor && data.gnssAnchor.hasFix) {
+        document.getElementById("gnssStatus").textContent =
+          `${data.gnssAnchor.latitude.toFixed(5)}, ${data.gnssAnchor.longitude.toFixed(5)}`;
+      }
+      render();
+    } catch (err) {
+      alert("JSON 格式解析失敗：" + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function exportCanvasPng() {
+  const link = document.createElement("a");
+  link.download = `RFMagMapper_Web_${currentLayer}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+// Init
+resizeCanvas();
+resetSimulation();
+</script>
+</body>
+</html>
