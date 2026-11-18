@@ -245,11 +245,13 @@
     </div>
 
     <div class="controls-row">
-      <button id="btnPatrol" class="primary" onclick="toggleAutoPatrol()">▶ 自動巡檢模擬</button>
+      <button onclick="zoomMap(1.25)">＋ 放大</button>
+      <button onclick="zoomMap(0.8)">－ 縮小</button>
+      <button onclick="centerOnUser()">◎ 置中藍點</button>
       <button onclick="stepRandom()">+1 步移動</button>
       <button onclick="resetSimulation()">清除重設</button>
       <span style="font-size:0.78rem;color:var(--muted);margin-left:auto;">
-        模式：<strong id="modeLabel" style="color:var(--cyan)">互動模擬環境</strong>
+        模式：<strong id="modeLabel" style="color:var(--cyan)">手機實地步行中</strong>
       </span>
     </div>
   </section>
@@ -604,12 +606,27 @@ function render() {
     ctx.fillText(hs.label, p.x - tw / 2, p.y - 18);
   }
 
-  // Current cursor
+  // Current cursor + directional heading arrow
   const cur = toScreen(curPos.x, curPos.y);
   ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
-  ctx.beginPath(); ctx.arc(cur.x, cur.y, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cur.x, cur.y, 16, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = "#00E5FF";
-  ctx.beginPath(); ctx.arc(cur.x, cur.y, 5.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cur.x, cur.y, 6.5, 0, Math.PI * 2); ctx.fill();
+  const arrowLen = 22;
+  const tipX = cur.x + arrowLen * Math.sin(phoneHeadingRad);
+  const tipY = cur.y - arrowLen * Math.cos(phoneHeadingRad);
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(cur.x, cur.y); ctx.lineTo(tipX, tipY); ctx.stroke();
+  // Arrowhead
+  const headAngle = Math.atan2(tipY - cur.y, tipX - cur.x);
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(tipX - 7 * Math.cos(headAngle - 0.5), tipY - 7 * Math.sin(headAngle - 0.5));
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(tipX - 7 * Math.cos(headAngle + 0.5), tipY - 7 * Math.sin(headAngle + 0.5));
+  ctx.stroke();
 
   const layerNames = { COMPOSITE: "綜合指數", WIFI: "Wi-Fi RF", BLE: "BLE 密度", MAG_60HZ: "60Hz 磁場" };
   document.getElementById("overlayBadge").innerHTML =
@@ -628,8 +645,62 @@ function moveTo(wx, wy) {
   render();
 }
 
+let isDragging = false;
+let dragMoved = false;
+let dragStart = { x: 0, y: 0 };
+let lastPinchDist = null;
+
+canvas.addEventListener("mousedown", (e) => {
+  isDragging = true;
+  dragMoved = false;
+  dragStart = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+});
+window.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+  dragMoved = true;
+  pan.x = e.clientX - dragStart.x;
+  pan.y = e.clientY - dragStart.y;
+  render();
+});
+window.addEventListener("mouseup", () => { isDragging = false; });
+
+canvas.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    dragMoved = false;
+    dragStart = { x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y };
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    lastPinchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}, { passive: true });
+
+canvas.addEventListener("touchmove", (e) => {
+  if (e.touches.length === 1 && isDragging) {
+    e.preventDefault();
+    dragMoved = true;
+    pan.x = e.touches[0].clientX - dragStart.x;
+    pan.y = e.touches[0].clientY - dragStart.y;
+    render();
+  } else if (e.touches.length === 2 && lastPinchDist) {
+    e.preventDefault();
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    scalePx = Math.min(160, Math.max(12, scalePx * (dist / lastPinchDist)));
+    lastPinchDist = dist;
+    render();
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchend", () => { isDragging = false; lastPinchDist = null; });
+
 canvas.addEventListener("click", (e) => {
-  if (isReplayMode) return;
+  if (isReplayMode || dragMoved) return;
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
@@ -642,9 +713,20 @@ canvas.addEventListener("click", (e) => {
 
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
-  scalePx = Math.min(120, Math.max(18, scalePx * (e.deltaY < 0 ? 1.1 : 0.9)));
+  scalePx = Math.min(160, Math.max(12, scalePx * (e.deltaY < 0 ? 1.1 : 0.9)));
   render();
 }, { passive: false });
+
+function zoomMap(factor) {
+  scalePx = Math.min(160, Math.max(12, scalePx * factor));
+  render();
+}
+
+function centerOnUser() {
+  pan.x = -curPos.x * scalePx;
+  pan.y = curPos.y * scalePx;
+  render();
+}
 
 window.addEventListener("keydown", (e) => {
   if (isReplayMode) return;
@@ -841,6 +923,7 @@ async function togglePhoneSensorWalk() {
 // Init
 resizeCanvas();
 resetSimulation();
+togglePhoneSensorWalk();
 </script>
 </body>
 </html>
